@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Login - Sistema de Pedidos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f8f9fa;
+        }
+        .login-form {
+            width: 100%;
+            max-width: 400px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-form">
+        <h3 class="text-center mb-4">🔐 Iniciar sesión</h3>
+        <form id="formLogin">
+            <div class="mb-3">
+                <label class="form-label">Usuario:</label>
+                <input type="text" class="form-control" id="usuario" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Contraseña:</label>
+                <input type="password" class="form-control" id="password" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+        </form>
+
+        <div class="alert alert-danger mt-3 d-none" id="alertaError">
+            ❌ Usuario o contraseña incorrectos.
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('formLogin').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const usuario = document.getElementById('usuario').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            // Usuarios hardcoded por ahora
+            const usuarios = {
+                "vendedor": { password: "1234", rol: "vendedor" },
+                "logistica": { password: "5678", rol: "logistica" }
+            };
+
+            if (usuarios[usuario] && usuarios[usuario].password === password) {
+                // Guardar rol en localStorage
+                localStorage.setItem('rol', usuarios[usuario].rol);
+
+                // Redirigir según rol
+                if (usuarios[usuario].rol === "vendedor") {
+                    window.location.href = "menu_vendedor.html";
+                } else if (usuarios[usuario].rol === "logistica") {
+                    window.location.href = "calendar.html";
+                }
+            } else {
+                document.getElementById('alertaError').classList.remove('d-none');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Al entrar a la página, consultar los pedidos pendientes:
+    fetch('http://127.0.0.1:8000/pedidos/pendientes_count')
+        .then(response => response.json())
+        .then(data => {
+            if (data.pendientes > 0) {
+                alert("🚚 ¡Tienes " + data.pendientes + " pedidos nuevos sin entrega! Ve a programarlos.");
+            }
+        })
+        .catch(error => {
+            console.error('Error al consultar pedidos pendientes:', error);
+        });
+});
+</script>

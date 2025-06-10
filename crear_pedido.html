@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Crear Pedido</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        input, select, button {
+            margin: 5px 0;
+            padding: 8px;
+            font-size: 14px;
+            width: 100%;
+        }
+        .producto-item {
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        const rol = localStorage.getItem('rol');
+
+        if (window.location.pathname.includes('calendar.html') && rol !== 'logistica') {
+            window.location.href = 'login.html';
+        }
+
+        if (window.location.pathname.includes('crear_cliente.html') && rol !== 'vendedor') {
+            window.location.href = 'login.html';
+        }
+
+        if (window.location.pathname.includes('crear_pedido.html') && rol !== 'vendedor') {
+            window.location.href = 'login.html';
+        }
+    </script>
+
+    <div class="container mt-3">
+        <button class="btn btn-secondary" onclick="window.location.href='menu_vendedor.html'">← Volver al menú</button>
+    </div>
+
+    <h2>📝 Crear Pedido</h2>
+
+    <!-- Formulario para crear pedido -->
+    <label>Cliente:</label>
+    <select id="clienteSelect"></select>
+
+    <label>Fecha de pedido:</label>
+    <input type="date" id="fechaPedido">
+
+    <button onclick="crearPedido()">Crear Pedido</button>
+
+    <hr>
+
+    <h2>🛒 Agregar Productos al Pedido</h2>
+    <div id="seccionProductos" style="display:none;">
+        <label>Descripción del producto:</label>
+        <input type="text" id="descripcionProducto">
+
+        <label>Cantidad:</label>
+        <input type="number" id="cantidadProducto" min="1" value="1">
+
+        <button onclick="agregarProducto()">Agregar Producto</button>
+
+        <h3>Productos en el pedido:</h3>
+        <div id="listaProductos"></div>
+
+        <br>
+        <button onclick="cerrarPedido()" style="background-color: #555; color: white;">Cerrar Pedido</button>
+    </div>
+
+    <script>
+        var pedidoIdActual = null;
+
+        // Cargar clientes al iniciar
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('http://127.0.0.1:8000/clientes')
+                .then(response => response.json())
+                .then(data => {
+                    const clienteSelect = document.getElementById('clienteSelect');
+                    data.forEach(cliente => {
+                        const option = document.createElement('option');
+                        option.value = cliente.id;
+                        option.textContent = cliente.nombre;
+                        clienteSelect.appendChild(option);
+                    });
+                });
+        });
+
+        // Crear pedido
+        function crearPedido() {
+            const id_cliente = document.getElementById('clienteSelect').value;
+            const fecha_pedido = document.getElementById('fechaPedido').value;
+
+            if (!fecha_pedido || fecha_pedido === "") {
+                alert('⚠️ Por favor selecciona una fecha de pedido antes de crear el pedido.');
+                return;
+            }
+
+            fetch('http://127.0.0.1:8000/pedidos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id_cliente: parseInt(id_cliente),
+                    fecha_pedido: fecha_pedido,
+                    descripcion: "Pedido desde formulario",
+                    estado: "pendiente"
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw err; });
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert('✅ Pedido creado con ID: ' + data.id);
+                pedidoIdActual = data.id;
+                document.getElementById('seccionProductos').style.display = 'block';
+                cargarProductos();
+            })
+            .catch(error => {
+                console.error('Error al crear pedido:', error);
+                alert('❌ Error al crear el pedido. Ver consola.');
+            });
+        }
+
+        // Agregar producto al pedido
+        function agregarProducto() {
+            const descripcion_producto = document.getElementById('descripcionProducto').value.trim();
+            const cantidad = document.getElementById('cantidadProducto').value;
+
+            if (!pedidoIdActual) {
+                alert('Primero crea el pedido');
+                return;
+            }
+
+            if (descripcion_producto === "") {
+                alert('⚠️ Debes ingresar la descripción del producto.');
+                return;
+            }
+
+            fetch('http://127.0.0.1:8000/pedido_items', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id_pedido: pedidoIdActual,
+                    descripcion_producto: descripcion_producto,
+                    cantidad: parseInt(cantidad)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('Producto agregado');
+                cargarProductos();
+                document.getElementById('descripcionProducto').value = '';
+                document.getElementById('cantidadProducto').value = 1;
+            });
+        }
+
+        // Eliminar producto del pedido
+        function eliminarProducto(id_producto) {
+            if (!confirm('¿Estás seguro de eliminar este producto?')) {
+                return;
+            }
+
+            fetch('http://127.0.0.1:8000/pedido_items/' + id_producto, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert('Producto eliminado');
+                    cargarProductos();
+                } else {
+                    alert('Error al eliminar el producto');
+                }
+            });
+        }
+
+        // Cargar productos ya agregados al pedido
+        function cargarProductos() {
+            fetch('http://127.0.0.1:8000/pedido_items?id_pedido=' + pedidoIdActual)
+            .then(response => response.json())
+            .then(data => {
+                const lista = document.getElementById('listaProductos');
+                lista.innerHTML = '';
+
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'producto-item';
+                    div.style.padding = '10px';
+                    div.style.marginBottom = '8px';
+                    div.style.border = '1px solid #ccc';
+                    div.style.borderRadius = '5px';
+
+                    div.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <b>Producto:</b> ${item.descripcion_producto} <br>
+                                <b>Cantidad:</b> ${item.cantidad}
+                            </div>
+                            <button onclick="eliminarProducto(${item.id})"
+                                    style="
+                                        background: none;
+                                        border: none;
+                                        color: red;
+                                        font-size: 18px;
+                                        cursor: pointer;
+                                        padding: 0;
+                                        margin-left: 10px;">
+                                ❌
+                            </button>
+                        </div>
+                    `;
+                    lista.appendChild(div);
+                });
+            });
+    }
+
+        // Cerrar pedido (limpiar todo)
+        function cerrarPedido() {
+            if (confirm('¿Deseas cerrar este pedido y empezar uno nuevo?')) {
+                pedidoIdActual = null;
+                document.getElementById('clienteSelect').value = '';
+                document.getElementById('fechaPedido').value = '';
+                document.getElementById('descripcionProducto').value = '';
+                document.getElementById('cantidadProducto').value = 1;
+                document.getElementById('listaProductos').innerHTML = '';
+                document.getElementById('seccionProductos').style.display = 'none';
+                alert('El pedido ha sido cerrado. Puedes crear uno nuevo.');
+            }
+        }
+
+    </script>
+
+</body>
+</html>

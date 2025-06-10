@@ -1,0 +1,12 @@
+Mapa de entregas del día → con Google Maps:
+✅ Mostrar en el sistema un mapa con marcadores → entregas del día.
+→ Basado en la dirección del cliente → usando Geocoding de Google.
+
+4️⃣ Dashboard:
+✅ Panel para logística (entregas pendientes hoy, esta semana, entregas por repartidor).
+✅ Panel para ventas (pedidos pendientes por entregar).
+
+👉 Esto se hace con una pantalla tipo dashboard (puedes usar chart.js o similar).
+
+🚀 5️⃣ Notificaciones (fase más avanzada):
+✅ Que cuando se programe la entrega → se envíe correo al cliente:

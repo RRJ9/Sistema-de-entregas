@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>Calendario de Entregas</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- FullCalendar CSS -->
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css' rel='stylesheet' />
+
+    <!-- FullCalendar JS -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/es.global.min.js'></script>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <style>
+        /* Fondo global */
+        body {
+            margin: 20px 10px;
+            padding: 0;
+            font-family: Arial, Helvetica Neue, Helvetica, sans-serif;
+            font-size: 14px;
+            background-color: #f8f9fa; /* gris muy claro */
+        }
+    
+        /* Panel de calendar */
+        #calendar {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            padding: 20px;
+            max-width: 1000px;
+            margin: 20px auto;
+        }
+    
+        /* Eventos */
+        .fc-event {
+            border-radius: 8px !important;
+            border: none !important;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 4px 6px;
+            transition: all 0.2s ease-in-out;
+        }
+    
+        /* Hover sobre evento */
+        .fc-event:hover {
+            opacity: 0.9;
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+    
+        /* Titulos de semana / dia */
+        .fc-toolbar-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #333;
+        }
+    
+        /* Filtros pills */
+        .nav-link {
+            font-weight: 500;
+            font-size: 15px;
+            padding: 8px 16px;
+            border-radius: 30px !important;
+            cursor: pointer;
+        }
+    
+        .nav-link.active {
+            background-color: #0d6efd !important;
+            color: white !important;
+        }
+    
+        /* Botones del calendar */
+        .fc-button {
+            border-radius: 6px !important;
+            font-size: 13px;
+            text-transform: capitalize !important;
+        }
+    
+        /* Fondo de headers del calendar */
+        .fc-col-header-cell {
+            background-color: #f0f0f0;
+            border: none;
+        }
+    
+        /* Texto de día */
+        .fc-daygrid-day-number {
+            font-size: 13px;
+            color: #555;
+        }
+    
+        /* Contenido del evento (para que se vea mejor el texto) */
+        .fc-event-title {
+            white-space: normal !important;
+            line-height: 1.2em !important;
+        }
+    </style>
+</head>
+<body>
+
+    
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-3">
+    <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">📅 Calendario de Entregas</span>
+        <button class="btn btn-outline-light" onclick="cerrarSesion()">Cerrar sesión</button>
+    </div>
+</nav>
+
+<div class="container mt-3 mb-3 text-center">
+    <button class="btn btn-success" onclick="exportarEntregasExcel()">📁 Exportar entregas del día (Excel)</button>
+</div>
+
+<div class="container mt-3 mb-3 text-center">
+<button class="btn btn-secondary" onclick="exportarEntregasPDF()">📝 Exportar entregas del día (PDF)</button>
+</div>
+
+
+<!-- Panel de pedidos sin entrega -->
+<div class="alert alert-primary d-flex justify-content-between align-items-center container" role="alert">
+    <div>
+        <strong>Pedidos sin entrega asignada:</strong> <span id="countPedidosSinEntrega">0</span> pedidos.
+    </div>
+    <button class="btn btn-sm btn-primary" onclick="abrirModalPedidosSinEntrega()">Ver pedidos</button>
+</div>
+
+<!-- Filtros -->
+<div class="container mt-3 mb-3">
+    <ul class="nav nav-pills justify-content-center">
+        <li class="nav-item">
+            <button class="nav-link active filter-btn" onclick="setEstadoFiltro('')">Todos</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link filter-btn" onclick="setEstadoFiltro('pendiente')">Pendiente</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link filter-btn" onclick="setEstadoFiltro('en_camino')">En camino</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link filter-btn" onclick="setEstadoFiltro('entregado')">Entregado</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link filter-btn" onclick="setEstadoFiltro('reagendado')">Reagendado</button>
+        </li>
+    </ul>
+</div>
+
+<!-- Calendar -->
+<div class="container">
+    <div id='calendar'></div>
+</div>
+
+<!-- Dashboard -->
+<div class="container mt-5">
+    <h3 class="mb-4 text-center">📊 Dashboard de Entregas y Ventas</h3>
+    <div class="d-flex justify-content-center flex-wrap gap-4">
+        <div>
+            <h5 class="text-center">Logística</h5>
+            <canvas id="logisticaChart" width="400" height="300"></canvas>
+        </div>
+        <div>
+            <h5 class="text-center">Ventas</h5>
+            <canvas id="ventasChart" width="400" height="300"></canvas>
+        </div>
+    </div>
+</div>
+    <!-- Modal Bootstrap para ver detalle de la entrega -->
+    <div class="modal fade" id="modalEntrega" tabindex="-1" aria-labelledby="modalEntregaLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modalEntregaLabel">Detalle de Entrega</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <p><strong>Pedido:</strong> <span id="modalPedido"></span></p>
+              <p><strong>Cliente:</strong> <span id="modalCliente"></span></p>
+              <p><strong>Fecha de entrega:</strong> <span id="modalFecha"></span></p>
+              <p><strong>Estado:</strong> <span id="modalEstado"></span></p>
+              <p><strong>Dirección:</strong> <span id="modalDireccion"></span></p>
+              <p><strong>Teléfono:</strong> <span id="modalTelefono"></span></p>
+              <p><strong>Notas:</strong> <span id="modalNotas"></span></p>
+    
+              <!-- Botón Ver artículos -->
+              <button class="btn btn-sm btn-info mb-2" id="btnVerArticulos">Ver artículos del pedido</button>
+              <ul class="list-group mt-2 d-none" id="listaArticulosPedido">
+                  <!-- Se llenará por JS -->
+              </ul>
+    
+              <!-- Cambiar estado -->
+              <div class="mt-4">
+                  <label for="selectEstadoCambio" class="form-label">Cambiar estado:</label>
+                  <select id="selectEstadoCambio" class="form-select mb-2">
+                      <option value="pendiente">Pendiente</option>
+                      <option value="en_camino">En camino</option>
+                      <option value="entregado">Entregado</option>
+                      <option value="reagendado">Reagendado</option>
+                  </select>
+                  <button class="btn btn-primary btn-sm mt-2" id="btnActualizarEstadoEntrega">Actualizar estado</button>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-danger" id="btnEliminarEntrega">Eliminar entrega</button>
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+          </div>
+        </div>
+    </div>
+
+    <!-- Modal Bootstrap para Nueva Entrega -->
+    <div class="modal fade" id="modalNuevaEntrega" tabindex="-1" aria-labelledby="modalNuevaEntregaLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="modalNuevaEntregaLabel">Agregar Nueva Entrega</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">ID Pedido</label>
+                <input type="number" class="form-control" id="inputPedidoId" placeholder="Ej: 1" required>
+              </div>
+      
+              <div class="mb-3">
+                <label class="form-label">Fecha de creación del Pedido</label>
+                <div class="form-control" id="fechaCreacionPedido" style="background-color: #e9ecef;">--</div>
+              </div>
+      
+              <div class="mb-3">
+                <label for="inputFechaEntrega" class="form-label">Fecha de Entrega</label>
+                <input type="date" class="form-control" id="inputFechaEntrega" required>
+              </div>
+      
+              <div class="mb-3">
+                <label for="selectEstado" class="form-label">Estado</label>
+                <select class="form-select" id="selectEstado">
+                  <option value="pendiente">Pendiente</option>
+                  <option value="en_camino">En camino</option>
+                  <option value="entregado">Entregado</option>
+                  <option value="reagendado">Reagendado</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-primary" id="btnCrearEntrega">Crear entrega</button>
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <!-- Modal Pedidos sin entrega -->
+    <div class="modal fade" id="modalPedidosSinEntrega" tabindex="-1" aria-labelledby="modalPedidosSinEntregaLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalPedidosSinEntregaLabel">Pedidos sin entrega asignada</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>ID Pedido</th>
+                  <th>Cliente</th>
+                  <th>Fecha Pedido</th>
+                  <th>Estado</th>
+                  <th>Descripción</th>
+                  <th>Detalle</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tablaPedidosSinEntrega">
+                <!-- Se llenará por JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Detalle de Pedido -->
+    <div class="modal fade" id="modalDetallePedido" tabindex="-1" aria-labelledby="modalDetallePedidoLabel" aria-hidden="true">
+        <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+            <h5 class="modal-title" id="modalDetallePedidoLabel">Detalle del Pedido</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+            <ul class="list-group" id="listaDetallePedido">
+                <!-- Se llenará por JS -->
+            </ul>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <script>
+
+        function cerrarSesion() {
+            localStorage.removeItem('rol');
+            window.location.href = 'login.html';
+        }
+        var estadoFiltro = '';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+
+            window.calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'es',
+                themeSystem: 'bootstrap5',
+                editable: true,
+                timeZone: 'UTC',
+                displayEventTime: false,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                events: function(fetchInfo, successCallback, failureCallback) {
+                    var url = 'http://127.0.0.1:8000/entregas/calendar';
+                    if (estadoFiltro !== '') {
+                        url += '?estado=' + encodeURIComponent(estadoFiltro);
+                    }
+
+                    fetch(url)
+                        .then(response => response.json())
+                        .then(data => successCallback(data))
+                        .catch(error => failureCallback(error));
+                },
+                eventClick: function(info) {
+                    document.getElementById('modalPedido').innerText = info.event.title.split(' - ')[0];
+                    document.getElementById('modalCliente').innerText = info.event.title.split(' - ')[1];
+                    document.getElementById('modalFecha').innerText = info.event.startStr.substring(0, 10);
+                    document.getElementById('modalEstado').innerText = info.event.extendedProps.estado || 'Sin estado';
+                    document.getElementById('modalDireccion').innerText = info.event.extendedProps.direccion || 'Sin dirección';
+                    document.getElementById('modalTelefono').innerText = info.event.extendedProps.telefono || 'Sin teléfono';
+                    document.getElementById('modalNotas').innerText = info.event.extendedProps.notas || 'Sin notas';
+                    document.getElementById('btnEliminarEntrega').setAttribute('data-entrega-id', info.event.id);
+                    document.getElementById('btnVerArticulos').setAttribute('data-id-pedido', info.event.extendedProps.id_pedido_original);
+                    document.getElementById('selectEstadoCambio').value = info.event.extendedProps.estado || 'pendiente';
+                    document.getElementById('btnActualizarEstadoEntrega').setAttribute('data-id', info.event.id);
+
+
+                    const lista = document.getElementById('listaArticulosPedido');
+                    lista.innerHTML = '';
+                    lista.classList.add('d-none');
+
+                    var modal = new bootstrap.Modal(document.getElementById('modalEntrega'));
+                    modal.show();
+                },
+                eventDrop: function(info) {
+                    var nuevaFecha = info.event.startStr.substring(0, 10);
+
+                    fetch('http://127.0.0.1:8000/entregas/' + info.event.id, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            fecha_entrega: nuevaFecha,
+                            estado: 'reagendado'
+                        })
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            alert('Entrega actualizada a nueva fecha: ' + nuevaFecha + ' (estado: reagendado)');
+                            calendar.refetchEvents();
+                            actualizarContadorPedidosSinEntrega();
+                        } else {
+                            alert('Error al actualizar la entrega');
+                            info.revert();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error al actualizar la entrega');
+                        info.revert();
+                    });
+                }
+            });
+
+            calendar.render();
+
+            document.getElementById('btnVerArticulos').addEventListener('click', function() {
+                const idPedido = this.getAttribute('data-id-pedido');
+
+                fetch(`http://127.0.0.1:8000/pedido_items?id_pedido=${idPedido}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const lista = document.getElementById('listaArticulosPedido');
+                        lista.innerHTML = '';
+                        lista.classList.remove('d-none');
+
+                        if (data.length === 0) {
+                            const item = document.createElement('li');
+                            item.className = 'list-group-item';
+                            item.innerText = 'Este pedido no tiene productos.';
+                            lista.appendChild(item);
+                        } else {
+                            data.forEach(producto => {
+                                const item = document.createElement('li');
+                                item.className = 'list-group-item';
+                                item.innerText = `${producto.descripcion_producto} - ${producto.cantidad} piezas`;
+                                lista.appendChild(item);
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error al obtener detalle del pedido:', error);
+                        alert('Error al obtener el detalle del pedido.');
+                    });
+            });
+
+            document.getElementById('btnEliminarEntrega').addEventListener('click', function() {
+                var entregaId = this.getAttribute('data-entrega-id');
+
+                if (confirm('¿Seguro que deseas eliminar esta entrega?')) {
+                    fetch('http://127.0.0.1:8000/entregas/' + entregaId, {
+                        method: 'DELETE'
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            alert('Entrega eliminada correctamente.');
+                            calendar.refetchEvents();
+                            actualizarContadorPedidosSinEntrega();
+                            var modalElement = document.getElementById('modalEntrega');
+                            var modalInstance = bootstrap.Modal.getInstance(modalElement);
+                            modalInstance.hide();
+                        } else {
+                            alert('Error al eliminar la entrega.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error al eliminar la entrega.');
+                    });
+                }
+            });
+
+            window.abrirModalNuevaEntrega = function() {
+                document.getElementById('inputPedidoId').value = '';
+                document.getElementById('inputFechaEntrega').value = '';
+                document.getElementById('selectEstado').value = 'pendiente';
+
+                var modal = new bootstrap.Modal(document.getElementById('modalNuevaEntrega'));
+                modal.show();
+            };
+
+            document.getElementById('btnCrearEntrega').addEventListener('click', function() {
+                var pedidoId = document.getElementById('inputPedidoId').value;
+                var fechaEntrega = document.getElementById('inputFechaEntrega').value;
+                var estado = document.getElementById('selectEstado').value;
+
+                if (!pedidoId || !fechaEntrega) {
+                    alert('Por favor completa todos los campos.');
+                    return;
+                }
+
+                fetch('http://127.0.0.1:8000/entregas', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id_pedido: parseInt(pedidoId),
+                        fecha_entrega: fechaEntrega,
+                        estado: estado
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Entrega creada correctamente.');
+                        calendar.refetchEvents();
+                        actualizarContadorPedidosSinEntrega();
+                        var modalElement = document.getElementById('modalNuevaEntrega');
+                        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+                        modalInstance.hide();
+                    } else {
+                        alert('Error al crear la entrega.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al crear la entrega.');
+                });
+            });
+
+            // Al cargar la página, actualizar contador
+            actualizarContadorPedidosSinEntrega();
+
+            document.getElementById('btnActualizarEstadoEntrega').addEventListener('click', function () {
+                const entregaId = this.getAttribute('data-id');
+                const nuevoEstado = document.getElementById('selectEstadoCambio').value;
+
+                fetch(`http://127.0.0.1:8000/entregas/${entregaId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        estado: nuevoEstado
+                    })
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Estado actualizado correctamente.');
+                        calendar.refetchEvents(); // Recargar calendario
+                        var modalElement = document.getElementById('modalEntrega');
+                        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+                        modalInstance.hide();
+                    } else {
+                        alert('Error al actualizar el estado.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error de conexión al actualizar el estado.');
+                });
+            });
+        });
+
+        function setEstadoFiltro(estado) {
+            estadoFiltro = estado;
+            calendar.refetchEvents();
+        }
+
+        function actualizarContadorPedidosSinEntrega() {
+            fetch('http://127.0.0.1:8000/pedidos/pendientes_count')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('countPedidosSinEntrega').innerText = data.pendientes;
+                })
+                .catch(error => {
+                    console.error('Error al actualizar contador de pedidos sin entrega:', error);
+                });
+        }
+        
+        function cargarDashboard() {
+            // Cargar Dashboard Logística
+            fetch('http://127.0.0.1:8000/estadisticas/logistica')
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('logisticaChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: data.dias,
+                            datasets: [{
+                                label: 'Entregas por Día',
+                                data: data.totales,
+                                backgroundColor: '#0d6efd'
+                            }]
+                        }
+                    });
+                });
+
+            // Cargar Dashboard Ventas
+            fetch('http://127.0.0.1:8000/estadisticas/ventas')
+                .then(response => response.json())
+                .then(data => {
+                    const ctx2 = document.getElementById('ventasChart').getContext('2d');
+                    new Chart(ctx2, {
+                        type: 'pie',
+                        data: {
+                            labels: data.vendedores,
+                            datasets: [{
+                                label: 'Pedidos Pendientes',
+                                data: data.pedidos,
+                                backgroundColor: [
+                                    '#FF6384',
+                                    '#36A2EB',
+                                    '#FFCE56',
+                                    '#4BC0C0',
+                                    '#9966FF',
+                                    '#FF9F40'
+                                ]
+                            }]
+                        }
+                    });
+                });
+        }
+
+        // Llamar al cargarDashboard cuando cargue la página
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarDashboard();
+        });
+
+
+        function cargarPedidosSinEntrega() {
+            fetch('http://127.0.0.1:8000/pedidos/sin_entrega')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('tablaPedidosSinEntrega');
+                    tbody.innerHTML = '';
+
+                    data.forEach(pedido => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${pedido.id_pedido}</td>
+                            <td>${pedido.cliente}</td>
+                            <td>${pedido.fecha_pedido}</td>
+                            <td>${pedido.estado}</td>
+                            <td>${pedido.descripcion || ''}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="verDetallePedido(${pedido.id_pedido})">Ver detalle</button>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-success" onclick="programarEntregaDesdePedido(${pedido.id_pedido}, '${pedido.fecha_pedido}')">Programar entrega</button>
+
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error al cargar pedidos sin entrega:', error);
+                });
+        }
+
+        function abrirModalPedidosSinEntrega() {
+            cargarPedidosSinEntrega();
+            var modal = new bootstrap.Modal(document.getElementById('modalPedidosSinEntrega'));
+            modal.show();
+        }
+
+        function programarEntregaDesdePedido(idPedido, fechaPedido) {
+            var modalElement = document.getElementById('modalPedidosSinEntrega');
+            var modalInstance = bootstrap.Modal.getInstance(modalElement);
+            modalInstance.hide();
+
+            document.getElementById('inputPedidoId').value = idPedido;
+            document.getElementById('inputFechaEntrega').value = '';
+            document.getElementById('selectEstado').value = 'pendiente';
+            document.getElementById('fechaCreacionPedido').innerText = fechaPedido;
+
+            var modalNuevaEntrega = new bootstrap.Modal(document.getElementById('modalNuevaEntrega'));
+            modalNuevaEntrega.show();
+        }
+
+        function exportarEntregasExcel() {
+            // Obtener la fecha de hoy en formato YYYY-MM-DD
+            const hoy = new Date();
+            const yyyy = hoy.getFullYear();
+            const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+            const dd = String(hoy.getDate()).padStart(2, '0');
+            const fechaHoy = `${yyyy}-${mm}-${dd}`;
+
+            // Llamar al nuevo endpoint completo
+            fetch(`http://127.0.0.1:8000/entregas/detalle_dia?fecha=${fechaHoy}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        alert('No hay entregas programadas para hoy.');
+                        return;
+                    }
+
+                    // Mapear datos a un formato amigable para Excel
+                    // Vamos a crear UNA FILA POR CADA PRODUCTO de cada entrega (para que sea fácil de leer en Excel)
+                    const entregas = [];
+
+                    data.forEach(entrega => {
+                        entrega.productos.forEach(producto => {
+                            entregas.push({
+                                'ID Entrega': entrega.id_entrega,
+                                'ID Pedido': entrega.id_pedido,
+                                'Cliente': entrega.cliente,
+                                'Dirección': entrega.direccion,
+                                'Teléfono': entrega.telefono,
+                                'Fecha Entrega': entrega.fecha_entrega,
+                                'Estado': entrega.estado,
+                                'Producto': producto.descripcion,
+                                'Cantidad': producto.cantidad
+                            });
+                        });
+                    });
+
+                    // Crear hoja Excel
+                    const worksheet = XLSX.utils.json_to_sheet(entregas);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Entregas del Día');
+
+                    // Descargar archivo
+                    XLSX.writeFile(workbook, `Entregas_${fechaHoy}.xlsx`);
+                })
+                .catch(error => {
+                    console.error('Error al exportar entregas:', error);
+                    alert('Error al exportar entregas.');
+                });
+        }
+
+        function exportarEntregasPDF() {
+            // Obtener la fecha de hoy en formato YYYY-MM-DD
+            const hoy = new Date();
+            const yyyy = hoy.getFullYear();
+            const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+            const dd = String(hoy.getDate()).padStart(2, '0');
+            const fechaHoy = `${yyyy}-${mm}-${dd}`;
+
+            fetch(`http://127.0.0.1:8000/entregas/detalle_dia?fecha=${fechaHoy}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        alert('No hay entregas programadas para hoy.');
+                        return;
+                    }
+
+                    const content = [];
+
+                    data.forEach((entrega, index) => {
+                        if (index > 0) {
+                            content.push({ text: '', pageBreak: 'before' });
+                        }
+
+                        // ENCABEZADO EMPRESA
+                        content.push(
+                            { text: 'RADIO REFRIGERACIÓN DE JUÁREZ, S.A. DE C.V.', style: 'header' },
+                            { text: 'RFC: XXXX000000X', style: 'subheader' },
+                            { text: 'Boulevard Manuel Gómez Morín', style: 'subheader' },
+                            { text: 'Tel: XXX-XXX-XXXX\n\n', style: 'subheader' },
+                            { canvas: [ { type: 'line', x1: 0, y1: 0, x2: 520, y2: 0, lineWidth: 1 } ], margin: [0, 5, 0, 10] },
+
+                            { text: 'Comprobante de Entrega de Pedido', style: 'title', margin: [0, 10, 0, 20] },
+
+                            {
+                                columns: [
+                                    { width: '*', text: `ID Entrega: ${entrega.id_entrega}` },
+                                    { width: '*', text: `ID Pedido: ${entrega.id_pedido}`, alignment: 'right' }
+                                ]
+                            },
+                            { text: `Fecha de Entrega: ${entrega.fecha_entrega}`, margin: [0, 5, 0, 5] },
+                            { text: `Cliente: ${entrega.cliente}` },
+                            { text: `Dirección: ${entrega.direccion}` },
+                            { text: `Teléfono: ${entrega.telefono}\n\n` },
+
+                            { text: 'Productos entregados:', style: 'sectionHeader', margin: [0, 10, 0, 8] },
+
+                            {
+                                style: 'tableExample',
+                                table: {
+                                    headerRows: 1,
+                                    widths: ['auto', '*', 'auto'],
+                                    body: [
+                                        [
+                                            { text: '#', style: 'tableHeader', alignment: 'center' },
+                                            { text: 'Descripción del producto', style: 'tableHeader' },
+                                            { text: 'Cantidad', style: 'tableHeader', alignment: 'center' }
+                                        ],
+                                        ...entrega.productos.map((producto, i) => [
+                                            { text: i + 1, alignment: 'center' },
+                                            producto.descripcion,
+                                            { text: producto.cantidad, alignment: 'center' }
+                                        ])
+                                    ]
+                                },
+                                layout: {
+                                    fillColor: function (rowIndex, node, columnIndex) {
+                                        return rowIndex === 0 ? '#eeeeee' : null;
+                                    }
+                                },
+                                margin: [0, 0, 0, 15]
+                            },
+
+                            { text: 'Recibido conforme:', style: 'sectionHeader', margin: [0, 10, 0, 5] },
+
+                            // Sección de firmas → 2 columnas
+                            {
+                                columns: [
+                                    {
+                                        width: '*',
+                                        stack: [
+                                            { text: 'Nombre y Firma del Cliente:', margin: [0, 10, 0, 30] },
+                                            { canvas: [ { type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 } ] }
+                                        ]
+                                    },
+                                    {
+                                        width: '*',
+                                        stack: [
+                                            { text: 'Nombre y Firma del Repartidor:', margin: [0, 10, 0, 30] },
+                                            { canvas: [ { type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 } ] }
+                                        ]
+                                    }
+                                ],
+                                columnGap: 50,
+                                margin: [0, 0, 0, 15]
+                            },
+
+                            { text: 'Nota: La entrega se realiza bajo conformidad del cliente.', italics: true, fontSize: 9, margin: [0, 0, 0, 20] }
+                        );
+                    });
+
+                    const docDefinition = {
+                        content: content,
+                        styles: {
+                            header: { fontSize: 20, bold: true },
+                            subheader: { fontSize: 11 },
+                            title: { fontSize: 16, bold: true, alignment: 'center' },
+                            sectionHeader: { fontSize: 14, bold: true },
+                            tableExample: { margin: [0, 5, 0, 15] },
+                            tableHeader: { bold: true, fontSize: 12, color: 'black' }
+                        },
+                        pageSize: 'A4',
+                        pageMargins: [40, 60, 40, 60]
+                    };
+
+                    pdfMake.createPdf(docDefinition).download(`Entregas_${fechaHoy}.pdf`);
+                })
+                .catch(error => {
+                    console.error('Error al exportar entregas PDF:', error);
+                    alert('Error al exportar entregas PDF.');
+                });
+        }
+
+        function verDetallePedido(idPedido) {
+            fetch(`http://127.0.0.1:8000/pedido_items?id_pedido=${idPedido}`)
+                .then(response => response.json())
+                .then(data => {
+                    const lista = document.getElementById('listaDetallePedido');
+                    lista.innerHTML = ''; // limpiar lista
+
+                    if (data.length === 0) {
+                        const item = document.createElement('li');
+                        item.className = 'list-group-item';
+                        item.innerText = 'Este pedido no tiene productos.';
+                        lista.appendChild(item);
+                    } else {
+                        data.forEach(producto => {
+                            const item = document.createElement('li');
+                            item.className = 'list-group-item';
+                            item.innerText = `${producto.descripcion_producto} - ${producto.cantidad} piezas`;
+                            lista.appendChild(item);
+                        });
+                    }
+
+                    // Mostrar modal
+                    var modal = new bootstrap.Modal(document.getElementById('modalDetallePedido'));
+                    modal.show();
+                })
+                .catch(error => {
+                    console.error('Error al obtener detalle del pedido:', error);
+                    alert('Error al obtener el detalle del pedido.');
+                });
+        }
+    </script>
+</body>
+</html>

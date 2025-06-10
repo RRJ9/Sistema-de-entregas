@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Registrar Cliente</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+
+    <!-- Verificación de roles -->
+    <script>
+        const rol = localStorage.getItem('rol');
+        if (window.location.pathname.includes('calendar.html') && rol !== 'logistica') window.location.href = 'login.html';
+        if (window.location.pathname.includes('crear_cliente.html') && rol !== 'vendedor') window.location.href = 'login.html';
+        if (window.location.pathname.includes('crear_pedido.html') && rol !== 'vendedor') window.location.href = 'login.html';
+    </script>
+
+    <div class="container mt-3">
+        <button class="btn btn-secondary" onclick="window.location.href='menu_vendedor.html'">← Volver al menú</button>
+    </div>
+
+    <div class="container mt-5">
+        <h2>📋 Registrar Nuevo Cliente</h2>
+
+        <form id="formCliente">
+            <div class="mb-3">
+                <label class="form-label">Nombre *</label>
+                <input type="text" class="form-control" id="nombre" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Correo *</label>
+                <input type="email" class="form-control" id="correo" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Teléfono *</label>
+                <input type="text" class="form-control" id="telefono" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Dirección *</label>
+                <input type="text" class="form-control" id="direccion" required>
+                <button type="button" class="btn btn-info mt-2" onclick="verificarDireccion()">Verificar dirección en mapa</button>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Ciudad *</label>
+                <input type="text" class="form-control" id="ciudad" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Código Postal *</label>
+                <input type="text" class="form-control" id="codigo_postal" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Registrar Cliente</button>
+        </form>
+
+        <!-- Alerta -->
+        <div class="alert alert-success mt-3 d-none" id="alertaExito">
+            ✅ Cliente registrado correctamente.
+        </div>
+    </div>
+
+    <!-- MODAL para el mapa (debe ir ANTES de los scripts) -->
+    <div class="modal fade" id="modalMapa" tabindex="-1" aria-labelledby="modalMapaLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalMapaLabel">Verificar Dirección</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="map" style="width: 100%; height: 450px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Librerías JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Tu lógica -->
+    <script>
+        // Mapa y marcador
+        let map;
+        let marker;
+        let mapInitialized = false;
+
+        function verificarDireccion() {
+            const direccion = document.getElementById('direccion').value.trim();
+            const ciudad = document.getElementById('ciudad').value.trim();
+            const direccionCompleta = ciudad ? `${direccion}, ${ciudad}, Chihuahua, Mexico` : direccion;
+
+            if (!direccion) {
+                alert('Por favor ingresa la dirección para verificar.');
+                return;
+            }
+
+            const modalMapa = new bootstrap.Modal(document.getElementById('modalMapa'));
+            modalMapa.show();
+
+            document.getElementById('modalMapa').addEventListener('shown.bs.modal', function () {
+                if (!mapInitialized) {
+                    map = L.map('map').setView([31.6904, -106.4245], 13); // Ciudad Juárez aprox
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap contributors'
+                    }).addTo(map);
+                    mapInitialized = true;
+                }
+
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 200);
+
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(direccionCompleta)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.length > 0) {
+                            const lat = parseFloat(data[0].lat);
+                            const lon = parseFloat(data[0].lon);
+
+                            map.setView([lat, lon], 16);
+
+                            if (marker) {
+                                marker.setLatLng([lat, lon]);
+                            } else {
+                                marker = L.marker([lat, lon]).addTo(map);
+                            }
+                        } else {
+                            alert('No se pudo encontrar la dirección.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error al geocodificar la dirección:', error);
+                        alert('Error al geocodificar la dirección.');
+                    });
+            }, { once: true });
+        }
+
+        document.getElementById('formCliente').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const nombre = document.getElementById('nombre').value.trim();
+            const correo = document.getElementById('correo').value.trim();
+            const telefono = document.getElementById('telefono').value.trim();
+            const direccion = document.getElementById('direccion').value.trim();
+            const ciudad = document.getElementById('ciudad').value.trim();
+            const codigo_postal = document.getElementById('codigo_postal').value.trim();
+
+            if (!nombre || !correo || !telefono || !direccion || !ciudad || !codigo_postal) {
+                alert('⚠️ Por favor llena todos los campos obligatorios.');
+                return;
+            }
+
+            fetch('http://127.0.0.1:8000/clientes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    nombre, correo, telefono, direccion, ciudad, codigo_postal
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('alertaExito').classList.remove('d-none');
+                    document.getElementById('formCliente').reset();
+                } else {
+                    alert('❌ Error al registrar el cliente.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('❌ Error al registrar el cliente.');
+            });
+        });
+    </script>
+
+</body>
+</html>
