@@ -331,7 +331,7 @@
                     right: 'dayGridMonth,timeGridWeek,timeGridDay'
                 },
                 events: function(fetchInfo, successCallback, failureCallback) {
-                    var url = 'http://127.0.0.1:8000/entregas/calendar';
+                    var url = 'https://sistema-de-entregas.onrender.com/entregas/calendar';
                     if (estadoFiltro !== '') {
                         url += '?estado=' + encodeURIComponent(estadoFiltro);
                     }
@@ -365,7 +365,7 @@
                 eventDrop: function(info) {
                     var nuevaFecha = info.event.startStr.substring(0, 10);
 
-                    fetch('http://127.0.0.1:8000/entregas/' + info.event.id, {
+                    fetch('https://sistema-de-entregas.onrender.com/entregas/' + info.event.id, {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json'
@@ -398,7 +398,7 @@
             document.getElementById('btnVerArticulos').addEventListener('click', function() {
                 const idPedido = this.getAttribute('data-id-pedido');
 
-                fetch(`http://127.0.0.1:8000/pedido_items?id_pedido=${idPedido}`)
+                fetch(`https://sistema-de-entregas.onrender.com/pedido_items?id_pedido=${idPedido}`)
                     .then(response => response.json())
                     .then(data => {
                         const lista = document.getElementById('listaArticulosPedido');
@@ -429,7 +429,7 @@
                 var entregaId = this.getAttribute('data-entrega-id');
 
                 if (confirm('¿Seguro que deseas eliminar esta entrega?')) {
-                    fetch('http://127.0.0.1:8000/entregas/' + entregaId, {
+                    fetch('https://sistema-de-entregas.onrender.com/entregas/' + entregaId, {
                         method: 'DELETE'
                     })
                     .then(response => {
@@ -470,7 +470,7 @@
                     return;
                 }
 
-                fetch('http://127.0.0.1:8000/entregas', {
+                fetch('https://sistema-de-entregas.onrender.com/entregas', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -506,7 +506,7 @@
                 const entregaId = this.getAttribute('data-id');
                 const nuevoEstado = document.getElementById('selectEstadoCambio').value;
 
-                fetch(`http://127.0.0.1:8000/entregas/${entregaId}`, {
+                fetch(`https://sistema-de-entregas.onrender.com/entregas/${entregaId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json'
@@ -539,7 +539,7 @@
         }
 
         function actualizarContadorPedidosSinEntrega() {
-            fetch('http://127.0.0.1:8000/pedidos/pendientes_count')
+            fetch('https://sistema-de-entregas.onrender.com/pedidos/pendientes_count')
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('countPedidosSinEntrega').innerText = data.pendientes;
@@ -551,7 +551,7 @@
         
         function cargarDashboard() {
             // Cargar Dashboard Logística
-            fetch('http://127.0.0.1:8000/estadisticas/logistica')
+            fetch('https://sistema-de-entregas.onrender.com/estadisticas/logistica')
                 .then(response => response.json())
                 .then(data => {
                     const ctx = document.getElementById('logisticaChart').getContext('2d');
@@ -569,7 +569,7 @@
                 });
 
             // Cargar Dashboard Ventas
-            fetch('http://127.0.0.1:8000/estadisticas/ventas')
+            fetch('https://sistema-de-entregas.onrender.com/estadisticas/ventas')
                 .then(response => response.json())
                 .then(data => {
                     const ctx2 = document.getElementById('ventasChart').getContext('2d');
@@ -601,7 +601,7 @@
 
 
         function cargarPedidosSinEntrega() {
-            fetch('http://127.0.0.1:8000/pedidos/sin_entrega')
+            fetch('https://sistema-de-entregas.onrender.com/pedidos/sin_entrega')
                 .then(response => response.json())
                 .then(data => {
                     const tbody = document.getElementById('tablaPedidosSinEntrega');
@@ -660,7 +660,7 @@
             const fechaHoy = `${yyyy}-${mm}-${dd}`;
 
             // Llamar al nuevo endpoint completo
-            fetch(`http://127.0.0.1:8000/entregas/detalle_dia?fecha=${fechaHoy}`)
+            fetch(`https://sistema-de-entregas.onrender.com/entregas/detalle_dia?fecha=${fechaHoy}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.length === 0) {
@@ -710,7 +710,7 @@
             const dd = String(hoy.getDate()).padStart(2, '0');
             const fechaHoy = `${yyyy}-${mm}-${dd}`;
 
-            fetch(`http://127.0.0.1:8000/entregas/detalle_dia?fecha=${fechaHoy}`)
+            fetch(`https://sistema-de-entregas.onrender.com/entregas/detalle_dia?fecha=${fechaHoy}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.length === 0) {
@@ -825,7 +825,7 @@
         }
 
         function verDetallePedido(idPedido) {
-            fetch(`http://127.0.0.1:8000/pedido_items?id_pedido=${idPedido}`)
+            fetch(`https://sistema-de-entregas.onrender.com/pedido_items?id_pedido=${idPedido}`)
                 .then(response => response.json())
                 .then(data => {
                     const lista = document.getElementById('listaDetallePedido');

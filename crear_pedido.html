@@ -79,7 +79,7 @@
 
         // Cargar clientes al iniciar
         document.addEventListener('DOMContentLoaded', function() {
-            fetch('http://127.0.0.1:8000/clientes')
+            fetch('https://sistema-de-entregas.onrender.com/clientes')
                 .then(response => response.json())
                 .then(data => {
                     const clienteSelect = document.getElementById('clienteSelect');
@@ -102,7 +102,7 @@
                 return;
             }
 
-            fetch('http://127.0.0.1:8000/pedidos', {
+            fetch('https://sistema-de-entregas.onrender.com/pedidos', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -147,7 +147,7 @@
                 return;
             }
 
-            fetch('http://127.0.0.1:8000/pedido_items', {
+            fetch('https://sistema-de-entregas.onrender.com/pedido_items', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -173,7 +173,7 @@
                 return;
             }
 
-            fetch('http://127.0.0.1:8000/pedido_items/' + id_producto, {
+            fetch('https://sistema-de-entregas.onrender.com/pedido_items/' + id_producto, {
                 method: 'DELETE'
             })
             .then(response => {
@@ -188,7 +188,7 @@
 
         // Cargar productos ya agregados al pedido
         function cargarProductos() {
-            fetch('http://127.0.0.1:8000/pedido_items?id_pedido=' + pedidoIdActual)
+            fetch('https://sistema-de-entregas.onrender.com/pedido_items?id_pedido=' + pedidoIdActual)
             .then(response => response.json())
             .then(data => {
                 const lista = document.getElementById('listaProductos');
