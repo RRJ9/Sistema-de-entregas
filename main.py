@@ -16,6 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import pdfplumber
 import re
 from twilio.rest import Client
+import os
+
 
 
 router = APIRouter()
@@ -317,8 +319,10 @@ def estadisticas_ventas(db: Session = Depends(get_db)):
 
 
 def enviar_whatsapp(destinatario_numero, destinatario_nombre, fecha_min, fecha_max):
-    account_sid = "REMOVIDO"
-    auth_token = "9b08eb03edd00d40e369eff448b306d0"
+    from dotenv import load_dotenv
+    load_dotenv()
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
     from_whatsapp = "whatsapp:+14155238886"  # número de Twilio
 
     to_whatsapp = f"whatsapp:+52{destinatario_numero}"  # 🇲🇽 número cliente
