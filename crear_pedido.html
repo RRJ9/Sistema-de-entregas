@@ -24,6 +24,7 @@
     </style>
 </head>
 <body>
+    <script src="config.js"></script>
     <script>
         const rol = localStorage.getItem('rol');
 
@@ -48,7 +49,8 @@
 
     <!-- Formulario para crear pedido -->
     <label>Cliente:</label>
-    <select id="clienteSelect"></select>
+    <input list="clientesList" id="clienteInput" class="form-control" placeholder="Escribe el nombre del cliente" autocomplete="off">
+    <datalist id="clientesList"></datalist>
 
     <label>Fecha de pedido:</label>
     <input type="date" id="fechaPedido">
@@ -62,8 +64,16 @@
         <label>Descripción del producto:</label>
         <input type="text" id="descripcionProducto">
 
+        
         <label>Cantidad:</label>
         <input type="number" id="cantidadProducto" min="1" value="1">
+
+        <div class="mb-3">
+            <label class="form-label">📄 O subir factura en PDF:</label>
+            <input type="file" id="archivoFactura" accept="application/pdf" class="form-control">
+            <button class="btn btn-sm btn-primary mt-2" onclick="subirFactura()">Leer Productos desde PDF</button>
+        </div>
+
 
         <button onclick="agregarProducto()">Agregar Producto</button>
 
@@ -79,22 +89,35 @@
 
         // Cargar clientes al iniciar
         document.addEventListener('DOMContentLoaded', function() {
-            fetch('https://sistema-de-entregas.onrender.com/clientes')
+            fetch(`${BASE_URL}/clientes`)
                 .then(response => response.json())
                 .then(data => {
-                    const clienteSelect = document.getElementById('clienteSelect');
+                    const datalist = document.getElementById('clientesList');
+                    datalist.innerHTML = '';
+
                     data.forEach(cliente => {
                         const option = document.createElement('option');
-                        option.value = cliente.id;
-                        option.textContent = cliente.nombre;
-                        clienteSelect.appendChild(option);
+                        option.value = `${cliente.nombre}`;
+                        option.setAttribute('data-id', cliente.id);
+                        datalist.appendChild(option);
                     });
+
+                    // Guarda la lista para buscar el ID luego
+                    window.listaClientes = data;
                 });
         });
 
         // Crear pedido
         function crearPedido() {
-            const id_cliente = document.getElementById('clienteSelect').value;
+            const nombreCliente = document.getElementById('clienteInput').value.trim();
+            const clienteEncontrado = window.listaClientes.find(c => c.nombre === nombreCliente);
+
+            if (!clienteEncontrado) {
+                alert('⚠️ El cliente no se encontró. Asegúrate de escribir exactamente el nombre.');
+                return;
+            }
+
+            const id_cliente = clienteEncontrado.id;
             const fecha_pedido = document.getElementById('fechaPedido').value;
 
             if (!fecha_pedido || fecha_pedido === "") {
@@ -102,7 +125,7 @@
                 return;
             }
 
-            fetch('https://sistema-de-entregas.onrender.com/pedidos', {
+            fetch(`${BASE_URL}/pedidos`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -147,7 +170,7 @@
                 return;
             }
 
-            fetch('https://sistema-de-entregas.onrender.com/pedido_items', {
+            fetch(`${BASE_URL}/pedido_items`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -173,7 +196,7 @@
                 return;
             }
 
-            fetch('https://sistema-de-entregas.onrender.com/pedido_items/' + id_producto, {
+            fetch(`${BASE_URL}/pedido_items/` + id_producto, {
                 method: 'DELETE'
             })
             .then(response => {
@@ -186,9 +209,65 @@
             });
         }
 
+        function subirFactura() {
+            const archivo = document.getElementById('archivoFactura').files[0];
+
+            if (!archivo) {
+                alert("Selecciona un archivo PDF.");
+                return;
+            }
+
+            if (!pedidoIdActual) {
+                alert("⚠️ Debes crear el pedido antes de subir la factura.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('archivo', archivo);
+
+            fetch(`${BASE_URL}/extraer_articulos_factura`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) throw new Error("Error al procesar el PDF");
+                return response.json();
+            })
+            .then(productos => {
+                if (!Array.isArray(productos) || productos.length === 0) {
+                    alert("⚠️ No se encontraron productos válidos.");
+                    return;
+                }
+
+                // Insertar cada producto al pedido
+                productos.forEach(producto => {
+                    const descripcionFinal = `Cantidad: ${producto.cantidad}\nCódigo: ${producto.codigo}\nClave SAT: ${producto.clave_sat}\nDescripción: ${producto.descripcion}`;
+
+                    fetch(`${BASE_URL}/pedido_items`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            id_pedido: pedidoIdActual,
+                            descripcion_producto: descripcionFinal,
+                            cantidad: parseInt(producto.cantidad)
+                        })
+                    })
+                    .then(() => cargarProductos());
+                });
+
+                alert("✅ Productos extraídos y agregados desde la factura.");
+            })
+            .catch(error => {
+                console.error('Error al subir la factura:', error);
+                alert("❌ No se pudo procesar el PDF.");
+            });
+        }
+
         // Cargar productos ya agregados al pedido
         function cargarProductos() {
-            fetch('https://sistema-de-entregas.onrender.com/pedido_items?id_pedido=' + pedidoIdActual)
+            fetch(`${BASE_URL}/pedido_items?id_pedido=` + pedidoIdActual)
             .then(response => response.json())
             .then(data => {
                 const lista = document.getElementById('listaProductos');
@@ -203,17 +282,17 @@
                     div.style.borderRadius = '5px';
 
                     div.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 16px;">
                             <div>
-                                <b>Producto:</b> ${item.descripcion_producto} <br>
-                                <b>Cantidad:</b> ${item.cantidad}
+                                <b>Producto:</b><br>
+                                <pre style="white-space: pre-wrap; font-size: 18px; font-family: 'Segoe UI', sans-serif; letter-spacing: 1px; line-height: 1.5;">${item.descripcion_producto}</pre>
                             </div>
                             <button onclick="eliminarProducto(${item.id})"
                                     style="
                                         background: none;
                                         border: none;
                                         color: red;
-                                        font-size: 18px;
+                                        font-size: 20px;
                                         cursor: pointer;
                                         padding: 0;
                                         margin-left: 10px;">
@@ -230,7 +309,7 @@
         function cerrarPedido() {
             if (confirm('¿Deseas cerrar este pedido y empezar uno nuevo?')) {
                 pedidoIdActual = null;
-                document.getElementById('clienteSelect').value = '';
+                document.getElementById('clienteInput').value = '';
                 document.getElementById('fechaPedido').value = '';
                 document.getElementById('descripcionProducto').value = '';
                 document.getElementById('cantidadProducto').value = 1;
