@@ -11,18 +11,27 @@ from sqlalchemy import func
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
-app = FastAPI()
-
+from fastapi import UploadFile, File, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+import pdfplumber
+import re
+from twilio.rest import Client
+import os
 
+
+
+router = APIRouter()
+app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # para pruebas locales → luego puedes restringir
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(router) 
+
 
 # Dependencia para sesión DB
 def get_db():
@@ -309,6 +318,37 @@ def estadisticas_ventas(db: Session = Depends(get_db)):
     }
 
 
+def enviar_whatsapp(destinatario_numero, destinatario_nombre, fecha_min, fecha_max):
+    from dotenv import load_dotenv
+    load_dotenv()
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    from_whatsapp = "whatsapp:+14155238886"  # número de Twilio
+
+    to_whatsapp = f"whatsapp:+52{destinatario_numero}"  # 🇲🇽 número cliente
+
+    client = Client(account_sid, auth_token)
+
+    mensaje = f"""
+Hola {destinatario_nombre},
+
+📝 Tu pedido ha sido programado para entrega entre el {fecha_min} y el {fecha_max}.  
+Nuestro equipo se comunicará contigo cuando esté en camino.
+
+Gracias por tu preferencia.
+Radio Refrigeración de Juárez
+    """
+
+    try:
+        message = client.messages.create(
+            body=mensaje,
+            from_=from_whatsapp,
+            to=to_whatsapp
+        )
+        print(f"✅ WhatsApp enviado a {to_whatsapp}")
+    except Exception as e:
+        print(f"❌ Error al enviar WhatsApp: {e}")
+
 def enviar_correo_entrega(destinatario_email, destinatario_nombre, fecha_min, fecha_max):
     remitente_email = "radiorefrigeraciondejuarez9@gmail.com"
     remitente_password = "fiixgspfealrklja"  
@@ -369,7 +409,47 @@ def crear_entrega(entrega: schemas.EntregaCreate, db: Session = Depends(get_db))
     # Enviar correo
     enviar_correo_entrega(cliente.correo, cliente.nombre, fecha_min, fecha_max)
 
+    # Enviar WhatsApp
+    enviar_whatsapp(cliente.telefono, cliente.nombre, fecha_min, fecha_max)
+
     return nueva_entrega
+
+@app.post("/extraer_articulos_factura")
+def extraer_articulos_factura(archivo: UploadFile = File(...)):
+    productos = []
+
+    def insertar_espacios_descripcion(texto):
+        texto = re.sub(r'(?<=\d)(?=[A-Z])', ' ', texto)
+        texto = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', texto)
+        texto = re.sub(r'(?<=[A-Z])(?=[A-Z][a-z])', ' ', texto)
+        texto = re.sub(r'(?<=[A-Z])(?=\d)', ' ', texto)
+        texto = re.sub(r'\s+', ' ', texto)
+        return texto.strip()
+
+    with pdfplumber.open(archivo.file) as pdf:
+        for pagina in pdf.pages:
+            texto = pagina.extract_text()
+            print("📝 TEXTO COMPLETO:\n", texto)
+
+            lineas = texto.split('\n')
+            for linea in lineas:
+                match = re.match(r"^(\d+\.\d+)\s+([A-Z0-9]+)\s+[A-Z]\s+[A-Z0-9]+\s+(\d+)\s+(.+?)\s+[\d,]+\.\d+\s+[\d,]+\.\d+$", linea)
+                if match:
+                    cantidad = match.group(1)
+                    codigo = match.group(2)
+                    clave_sat = match.group(3)
+                    descripcion_cruda = match.group(4)
+                    descripcion = insertar_espacios_descripcion(descripcion_cruda)
+
+                    productos.append({
+                        "cantidad": int(float(cantidad)),
+                        "codigo": codigo,
+                        "clave_sat": clave_sat,
+                        "descripcion": descripcion
+                    })
+                    print("✅ Detectado producto:", productos[-1])
+
+    return productos
 
 @app.get("/ping")
 def ping():
