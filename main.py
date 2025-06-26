@@ -318,37 +318,6 @@ def estadisticas_ventas(db: Session = Depends(get_db)):
     }
 
 
-def enviar_whatsapp(destinatario_numero, destinatario_nombre, fecha_min, fecha_max):
-    from dotenv import load_dotenv
-    load_dotenv()
-    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-    from_whatsapp = "whatsapp:+14155238886"  # número de Twilio
-
-    to_whatsapp = f"whatsapp:+52{destinatario_numero}"  # 🇲🇽 número cliente
-
-    client = Client(account_sid, auth_token)
-
-    mensaje = f"""
-Hola {destinatario_nombre},
-
-📝 Tu pedido ha sido programado para entrega entre el {fecha_min} y el {fecha_max}.  
-Nuestro equipo se comunicará contigo cuando esté en camino.
-
-Gracias por tu preferencia.
-Radio Refrigeración de Juárez
-    """
-
-    try:
-        message = client.messages.create(
-            body=mensaje,
-            from_=from_whatsapp,
-            to=to_whatsapp
-        )
-        print(f"✅ WhatsApp enviado a {to_whatsapp}")
-    except Exception as e:
-        print(f"❌ Error al enviar WhatsApp: {e}")
-
 def enviar_correo_entrega(destinatario_email, destinatario_nombre, fecha_min, fecha_max):
     remitente_email = "radiorefrigeraciondejuarez9@gmail.com"
     remitente_password = "fiixgspfealrklja"  
@@ -408,9 +377,6 @@ def crear_entrega(entrega: schemas.EntregaCreate, db: Session = Depends(get_db))
 
     # Enviar correo
     enviar_correo_entrega(cliente.correo, cliente.nombre, fecha_min, fecha_max)
-
-    # Enviar WhatsApp
-    enviar_whatsapp(cliente.telefono, cliente.nombre, fecha_min, fecha_max)
 
     return nueva_entrega
 
