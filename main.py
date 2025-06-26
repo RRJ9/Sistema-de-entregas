@@ -17,6 +17,9 @@ import pdfplumber
 import re
 from twilio.rest import Client
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 
@@ -320,7 +323,7 @@ def estadisticas_ventas(db: Session = Depends(get_db)):
 
 def enviar_correo_entrega(destinatario_email, destinatario_nombre, fecha_min, fecha_max):
     remitente_email = "radiorefrigeraciondejuarez9@gmail.com"
-    remitente_password = "fiixgspfealrklja"  
+    remitente_password = os.getenv("GMAIL_APP_PASSWORD")  
 
     # Crear mensaje
     msg = MIMEMultipart()
