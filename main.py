@@ -56,30 +56,6 @@ def crear_pedido(pedido: schemas.PedidoCreate, db: Session = Depends(get_db)):
 def listar_entregas_pendientes(db: Session = Depends(get_db)):
     return db.query(models.Entrega).filter(models.Entrega.estado == "pendiente").all()
 
-@app.post("/entregas")
-def crear_entrega(entrega: schemas.EntregaCreate, db: Session = Depends(get_db)):
-    nueva_entrega = models.Entrega(**entrega.dict())
-    db.add(nueva_entrega)
-    db.commit()
-    db.refresh(nueva_entrega)
-    # Obtener cliente
-    pedido = db.query(models.Pedido).filter(models.Pedido.id == nueva_entrega.id_pedido).first()
-    cliente = db.query(models.Cliente).filter(models.Cliente.id == pedido.id_cliente).first()
-
-    # Calcular rango basado en "hoy"
-    hoy = datetime.today().date()
-
-    fecha_min_date = hoy + timedelta(days=1)
-    fecha_max_date = hoy + timedelta(days=3)
-
-    fecha_min = fecha_min_date.strftime("%Y-%m-%d")
-    fecha_max = fecha_max_date.strftime("%Y-%m-%d")
-
-    # Enviar correo
-    enviar_correo_entrega(cliente.correo, cliente.nombre, fecha_min, fecha_max)
-
-
-    return nueva_entrega
 
 @app.put("/entregas/{entrega_id}")
 def actualizar_entrega(entrega_id: int, entrega_update: schemas.EntregaUpdate, db: Session = Depends(get_db)):
@@ -381,7 +357,58 @@ def crear_entrega(entrega: schemas.EntregaCreate, db: Session = Depends(get_db))
     # Enviar correo
     enviar_correo_entrega(cliente.correo, cliente.nombre, fecha_min, fecha_max)
 
+        # ✅ Enviar WhatsApp (si tiene teléfono)
+    if cliente.telefono:
+        try:
+            numero_formateado = normalizar_numero_mexicano(cliente.telefono)
+            enviar_whatsapp_entrega(numero_formateado, cliente.nombre, fecha_min, fecha_max)
+        except ValueError as e:
+            print(str(e))  # Número no válido, se omite WhatsApp
+
     return nueva_entrega
+
+def enviar_whatsapp_entrega(numero_cliente, nombre_cliente, fecha_min, fecha_max):
+    try:
+        account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+        auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+        from_whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")  
+
+        client = Client(account_sid, auth_token)
+
+        mensaje = (
+            f"Hola {nombre_cliente}, tu pedido ha sido programado para entrega entre el {fecha_min} y el {fecha_max}. "
+            "Te contactaremos cuando esté en camino. ¡Gracias por tu preferencia!"
+        )
+
+        client.messages.create(
+            body=mensaje,
+            from_=from_whatsapp_number,
+            to=numero_cliente
+        )
+
+        print(f"✅ Mensaje WhatsApp enviado a {numero_cliente}")
+
+    except Exception as e:
+        print(f"❌ Error al enviar WhatsApp: {e}")
+
+def normalizar_numero_mexicano(numero: str) -> str:
+    """
+    Convierte un número en cualquier formato a formato WhatsApp válido para México.
+    """
+    import re
+
+    numero_limpio = re.sub(r"[^\d+]", "", numero)
+
+    if numero_limpio.startswith("+521") and len(numero_limpio) == 13:
+        return f"whatsapp:{numero_limpio}"
+
+    if numero_limpio.startswith("+52") and len(numero_limpio) == 12:
+        return f"whatsapp:+521{numero_limpio[3:]}"
+
+    if len(numero_limpio) == 10:
+        return f"whatsapp:+521{numero_limpio}"
+
+    raise ValueError(f"⚠️ Número no válido para WhatsApp México: {numero}")
 
 @app.post("/extraer_articulos_factura")
 def extraer_articulos_factura(archivo: UploadFile = File(...)):
